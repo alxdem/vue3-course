@@ -18,6 +18,7 @@
                   v-model="ticker"
                   v-on:keydown.enter="add"
                   @input="tickerInput"
+                  ref="mainInput"
                   type="text"
                   name="wallet"
                   id="wallet"
@@ -35,9 +36,13 @@
               />
             </div>
             <div
+                v-if="helpList.length > 0"
                 class="flex bg-white shadow-md p-1 rounded-md shadow-md flex-wrap"
             >
               <span
+                  v-for="label in helpList"
+                  :key="label.Id"
+                  @click="tickerLabelClick(label)"
                   class="
                   inline-flex
                   items-center
@@ -51,58 +56,10 @@
                   cursor-pointer
                 "
               >
-                BTC
-              </span>
-              <span
-                  class="
-                  inline-flex
-                  items-center
-                  px-2
-                  m-1
-                  rounded-md
-                  text-xs
-                  font-medium
-                  bg-gray-300
-                  text-gray-800
-                  cursor-pointer
-                "
-              >
-                DOGE
-              </span>
-              <span
-                  class="
-                  inline-flex
-                  items-center
-                  px-2
-                  m-1
-                  rounded-md
-                  text-xs
-                  font-medium
-                  bg-gray-300
-                  text-gray-800
-                  cursor-pointer
-                "
-              >
-                BCH
-              </span>
-              <span
-                  class="
-                  inline-flex
-                  items-center
-                  px-2
-                  m-1
-                  rounded-md
-                  text-xs
-                  font-medium
-                  bg-gray-300
-                  text-gray-800
-                  cursor-pointer
-                "
-              >
-                CHD
+                {{label.Symbol}}
               </span>
             </div>
-            <div class="text-sm text-red-600">Такой тикер уже добавлен</div>
+            <div v-if="isErrorShow" class="text-sm text-red-600">Такой тикер уже добавлен</div>
           </div>
         </div>
         <button
@@ -272,24 +229,32 @@ export default {
       tickers: [],
       select: null,
       graph: [],
-      dataInfo: null
+      dataInfo: null,
+      helpList: [],
+      isErrorShow: false
     };
   },
   methods: {
     add() {
-      const currentTicker = {
-        name: this.ticker,
-        price: "-"
-      };
-      this.tickers.push(currentTicker);
+      if (this.isBe(this.ticker) || !this.dataInfo[this.ticker]) {
+        this.isErrorShow = true;
+      } else {
+        const currentTicker = {
+          name: this.ticker,
+          price: "-"
+        };
+        this.tickers.push(currentTicker);
 
-      localStorage.setItem('crypto-list', JSON.stringify(this.tickers));
-      this.subscribeToUpdates(currentTicker.name);
+        localStorage.setItem("crypto-list", JSON.stringify(this.tickers));
+        this.subscribeToUpdates(currentTicker.name);
 
-      this.ticker = "";
+        this.ticker = "";
+        this.isErrorShow = false;
+      }
     },
     handlerDelete(tickerToRemove) {
       this.tickers = this.tickers.filter((t) => t !== tickerToRemove);
+      localStorage.setItem("crypto-list", JSON.stringify(this.tickers));
     },
     normalizeGraph() {
       const maxValue = Math.max(...this.graph);
@@ -298,6 +263,20 @@ export default {
       return this.graph.map((price) => {
         return 5 + ((price - minValue) * 95) / (maxValue - minValue);
       });
+    },
+    tickerLabelClick(e) {
+      if (this.isBe(e.Symbol)) {
+        this.isErrorShow = true;
+      } else {
+        this.ticker = e.Symbol;
+        this.helpList = [];
+        this.$refs.mainInput.focus();
+        this.isErrorShow = false;
+      }
+    },
+    isBe(value) {
+      const arr = this.tickers.filter((ticker) => ticker.name.toUpperCase() === value.toUpperCase());
+      return Boolean(arr.length);
     },
     selectSet(tiker) {
       this.select = tiker;
@@ -318,11 +297,19 @@ export default {
       }, 3000);
     },
     tickerInput() {
-      console.log('e', this.ticker)
+      this.helpList = [];
+      const valLenght = this.ticker.length;
+
+      Object.entries(this.dataInfo).forEach((obj) => {
+        const isFit = obj[0].slice(0, valLenght).toUpperCase() === this.ticker.toUpperCase();
+        if (isFit && this.helpList.length < 4 && this.ticker.length) {
+          this.helpList.push(obj[1]);
+        }
+      });
     }
   },
   async created() {
-    const tickersData = localStorage.getItem('crypto-list');
+    const tickersData = localStorage.getItem("crypto-list");
 
     if (tickersData) {
       this.tickers = JSON.parse(tickersData);
@@ -331,13 +318,13 @@ export default {
       });
     }
 
-    await fetch('https://min-api.cryptocompare.com/data/all/coinlist?summary=true')
-        .then(res => {
-          return res.json();
-        })
-        .then(data => {
-          this.dataInfo = data.Data;
-        });
+    await fetch("https://min-api.cryptocompare.com/data/all/coinlist?summary=true")
+      .then(res => {
+        return res.json();
+      })
+      .then(data => {
+        this.dataInfo = data.Data;
+      });
   },
 };
 </script>
